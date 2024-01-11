@@ -31,6 +31,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Lark is the lark notification
+type Lark struct {
+	MsgType string  `json:"msg_type"`
+	Content Content `json:"content"`
+}
+
+// Content is the lark notification content
+type Content struct {
+	Text string `json:"text"`
+}
+
 // NotifyConfig is the slack notification configuration
 type NotifyConfig struct {
 	base.DefaultNotify `yaml:",inline"`
@@ -49,13 +60,25 @@ func (c *NotifyConfig) Config(gConf global.NotifySettings) error {
 
 // SendLark is the wrapper for SendLarkNotification
 func (c *NotifyConfig) SendLark(title, msg string) error {
-	return c.SendLarkNotification(msg)
+	lark := &Lark{
+		MsgType: "text",
+		Content: Content{
+			Text: fmt.Sprintf("%s\n%s", title, msg),
+		},
+	}
+	return c.SendLarkNotification(lark)
 }
 
 // SendLarkNotification will post to an 'Robot Webhook' url in Lark Apps. It accepts
 // some text and the Lark robot will send it in group.
-func (c *NotifyConfig) SendLarkNotification(msg string) error {
-	req, err := http.NewRequest(http.MethodPost, c.WebhookURL, bytes.NewBuffer([]byte(msg)))
+func (c *NotifyConfig) SendLarkNotification(lark *Lark) error {
+	data, err := json.Marshal(lark)
+	if err != nil {
+		log.Errorf("[%s / %s ] - %v, err - %s", c.Kind(), c.Name(), lark, err)
+		return fmt.Errorf("[%s / %s] - Error from json marshal [%s] - [%s]",
+			c.Kind(), c.Name(), lark, err)
+	}
+	req, err := http.NewRequest(http.MethodPost, c.WebhookURL, bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
